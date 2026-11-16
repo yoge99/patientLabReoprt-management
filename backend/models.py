@@ -43,7 +43,3 @@ class LabReport(Base):
     file_path = Column(String, nullable=True)
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
     patient = relationship("Patient", back_populates="reports")
-
-    @property
-    def patient_name(self):
-        return self.patient.name if self.patient else "Unknown"

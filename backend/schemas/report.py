@@ -24,5 +24,4 @@ class ReportOut(ReportCreate):
     status: str
     file_path: Optional[str]
     created_at: datetime
-    patient_name: Optional[str] = None
     class Config: from_attributes = True
