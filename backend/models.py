@@ -35,15 +35,28 @@ class LabReport(Base):
     patient_id = Column(String, ForeignKey("patients.id"), nullable=False)
     report_type = Column(Enum(ReportTypeEnum), nullable=False)
     report_date = Column(Date, nullable=False)
-    result_value = Column(Float, nullable=False)
-    unit = Column(String, nullable=False)
-    ref_min = Column(Float, nullable=False)
-    ref_max = Column(Float, nullable=False)
+    result_value = Column(String, nullable=True)
+    unit = Column(String, nullable=True)
+    ref_min = Column(Float, nullable=True)
+    ref_max = Column(Float, nullable=True)
     status = Column(Enum(StatusEnum), default=StatusEnum.Pending)
     file_path = Column(String, nullable=True)
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
     patient = relationship("Patient", back_populates="reports")
+    items = relationship("ReportItem", back_populates="report", cascade="all, delete-orphan")
 
     @property
     def patient_name(self):
         return self.patient.name if self.patient else "Unknown"
+
+class ReportItem(Base):
+    __tablename__ = "report_items"
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    report_id = Column(String, ForeignKey("reports.id"), nullable=False)
+    name = Column(String, nullable=False)
+    result_value = Column(String, nullable=False)
+    unit = Column(String, nullable=True, default="")
+    ref_min = Column(Float, nullable=True)
+    ref_max = Column(Float, nullable=True)
+    status = Column(String, default="Normal")
+    report = relationship("LabReport", back_populates="items")

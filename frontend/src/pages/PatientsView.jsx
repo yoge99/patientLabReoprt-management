@@ -14,6 +14,9 @@ import {
   Filter,
   CheckCircle2,
   ExternalLink,
+  ChevronDown,
+  ChevronRight,
+  Layers,
 } from "lucide-react";
 import StatusBadge from "../components/StatusBadge";
 import { STATUSES, REPORT_TYPES } from "../constants/config";
@@ -32,6 +35,7 @@ export default function PatientsView({
 }) {
   const [activePatient, setActivePatient] = useState(null);
   const [reports, setReports] = useState([]);
+  const [expandedReports, setExpandedReports] = useState({});
   const [filters, setFilters] = useState({
     status: "",
     report_type: "",
@@ -41,12 +45,10 @@ export default function PatientsView({
   const [loadingReports, setLoadingReports] = useState(false);
   const [localSearch, setLocalSearch] = useState(searchFilter);
 
-  // Sync search filter from parent if provided
   useEffect(() => {
     setLocalSearch(searchFilter);
   }, [searchFilter]);
 
-  // Determine which patient to select
   useEffect(() => {
     if (patients.length === 0) {
       setActivePatient(null);
@@ -78,6 +80,10 @@ export default function PatientsView({
         ...currentFilters,
       });
       setReports(data);
+      // Auto-expand all reports by default so users see metrics immediately
+      const exp = {};
+      data.forEach((r) => { exp[r.id] = true; });
+      setExpandedReports(exp);
     } catch (err) {
       console.error("Failed to load patient reports:", err);
     } finally {
@@ -85,12 +91,15 @@ export default function PatientsView({
     }
   };
 
-  // Re-fetch reports when filters change
   useEffect(() => {
     if (activePatient) {
       loadReportsForPatient(activePatient.id, filters);
     }
   }, [filters, activePatient?.id]);
+
+  const toggleExpand = (id) => {
+    setExpandedReports((prev) => ({ ...prev, [id]: !prev[id] }));
+  };
 
   const handleDeletePatient = async (id) => {
     if (!window.confirm("Are you sure you want to delete this patient profile and all their lab records?")) {
@@ -105,7 +114,7 @@ export default function PatientsView({
   };
 
   const handleDeleteReport = async (reportId) => {
-    if (!window.confirm("Delete this lab report?")) return;
+    if (!window.confirm("Delete this diagnostic panel?")) return;
     try {
       await deleteReport(reportId);
       if (activePatient) {
@@ -117,7 +126,6 @@ export default function PatientsView({
     }
   };
 
-  // Filter patients by localSearch
   const filteredPatients = patients.filter(
     (p) =>
       p.name.toLowerCase().includes(localSearch.toLowerCase()) ||
@@ -269,7 +277,7 @@ export default function PatientsView({
                     className="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-semibold text-white bg-indigo-600 hover:bg-indigo-700 active:scale-[0.98] rounded-xl shadow-xs transition-all"
                   >
                     <Plus className="w-4 h-4" />
-                    <span>+ Add Lab Report</span>
+                    <span>+ Add Panel Report</span>
                   </button>
                   <button
                     onClick={() => handleDeletePatient(activePatient.id)}
@@ -284,17 +292,17 @@ export default function PatientsView({
               {/* Patient Quick Stats Chips */}
               <div className="grid grid-cols-3 gap-4 pt-4 text-xs">
                 <div className="p-3 rounded-xl bg-slate-50/70 border border-slate-100">
-                  <span className="text-slate-400 font-medium">Total Test History</span>
-                  <p className="text-base font-bold text-slate-800 mt-0.5">{reports.length} Reports</p>
+                  <span className="text-slate-400 font-medium">Total Panels Recorded</span>
+                  <p className="text-base font-bold text-slate-800 mt-0.5">{reports.length} Panels</p>
                 </div>
                 <div className="p-3 rounded-xl bg-slate-50/70 border border-slate-100">
-                  <span className="text-slate-400 font-medium">Abnormal Results</span>
+                  <span className="text-slate-400 font-medium">Abnormal Flags</span>
                   <p className={`text-base font-bold mt-0.5 ${abnormalCount > 0 ? "text-rose-600" : "text-emerald-600"}`}>
                     {abnormalCount} Abnormal
                   </p>
                 </div>
                 <div className="p-3 rounded-xl bg-slate-50/70 border border-slate-100">
-                  <span className="text-slate-400 font-medium">Latest Evaluation</span>
+                  <span className="text-slate-400 font-medium">Latest Test Date</span>
                   <p className="text-base font-bold text-slate-800 mt-0.5">
                     {reports[0]?.report_date || "No tests logged"}
                   </p>
@@ -302,13 +310,13 @@ export default function PatientsView({
               </div>
             </div>
 
-            {/* Related Option: Patient's Lab Reports History */}
+            {/* Diagnostic Reports History */}
             <div className="bg-white rounded-2xl border border-slate-200/80 shadow-xs overflow-hidden">
               {/* Filter Toolbar */}
               <div className="px-6 py-4 border-b border-slate-100 flex flex-col md:flex-row md:items-center md:justify-between gap-3 bg-slate-50/50">
                 <div className="flex items-center gap-2">
-                  <FileText className="w-4 h-4 text-indigo-600" />
-                  <h3 className="text-sm font-bold text-slate-800">Diagnostic Reports History</h3>
+                  <Layers className="w-4 h-4 text-indigo-600" />
+                  <h3 className="text-sm font-bold text-slate-800">Diagnostic Panels History</h3>
                   <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700">
                     {reports.length}
                   </span>
@@ -333,7 +341,7 @@ export default function PatientsView({
                     onChange={(e) => setFilters((prev) => ({ ...prev, report_type: e.target.value }))}
                     className="text-xs border border-slate-200 rounded-xl px-2.5 py-1.5 bg-white text-slate-700 focus:outline-none focus:border-indigo-500"
                   >
-                    <option value="">All Test Types</option>
+                    <option value="">All Panel Types</option>
                     {REPORT_TYPES.map((t) => (
                       <option key={t} value={t}>
                         {t}
@@ -359,58 +367,57 @@ export default function PatientsView({
                 </div>
               </div>
 
-              {/* Reports Table */}
+              {/* Reports List */}
               {loadingReports ? (
-                <div className="p-12 text-center text-xs text-slate-400">Loading reports...</div>
+                <div className="p-12 text-center text-xs text-slate-400">Loading diagnostic panels...</div>
               ) : reports.length === 0 ? (
                 <div className="p-12 text-center">
                   <FileText className="w-10 h-10 text-slate-300 mx-auto mb-2" />
                   <p className="text-sm font-medium text-slate-600">No lab reports found for this patient</p>
-                  <p className="text-xs text-slate-400 mt-1">Record the first clinical test for {activePatient.name}</p>
+                  <p className="text-xs text-slate-400 mt-1">Record a multi-metric panel for {activePatient.name}</p>
                   <button
                     onClick={() => onOpenAddReportForPatient(activePatient.id)}
                     className="mt-4 px-4 py-2 text-xs font-semibold text-white bg-indigo-600 hover:bg-indigo-700 rounded-xl transition-all shadow-xs"
                   >
-                    + Add Lab Report
+                    + Add Diagnostic Panel
                   </button>
                 </div>
               ) : (
-                <div className="overflow-x-auto">
-                  <table className="w-full text-left text-xs">
-                    <thead>
-                      <tr className="bg-slate-50/80 text-slate-500 font-semibold border-b border-slate-100 uppercase tracking-wider">
-                        <th className="px-6 py-3">Test Type</th>
-                        <th className="px-6 py-3">Date</th>
-                        <th className="px-6 py-3">Observed Result</th>
-                        <th className="px-6 py-3">Reference Interval</th>
-                        <th className="px-6 py-3">Status</th>
-                        <th className="px-6 py-3">Attachment</th>
-                        <th className="px-6 py-3 text-right">Actions</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-100">
-                      {reports.map((r) => (
-                        <tr key={r.id} className="hover:bg-slate-50/80 transition-colors">
-                          <td className="px-6 py-3.5 font-bold text-slate-800">
-                            {r.report_type}
-                            <span className="block font-mono text-[10px] text-slate-400 font-normal">
-                              {r.id}
-                            </span>
-                          </td>
-                          <td className="px-6 py-3.5 text-slate-500">{r.report_date}</td>
-                          <td className="px-6 py-3.5 font-extrabold text-slate-800">
-                            {r.result_value} <span className="font-normal text-slate-500 text-[11px]">{r.unit}</span>
-                          </td>
-                          <td className="px-6 py-3.5 text-slate-600">
-                            <span className="font-mono text-xs bg-slate-100 px-2 py-0.5 rounded">
-                              {r.ref_min} – {r.ref_max} {r.unit}
-                            </span>
-                          </td>
-                          <td className="px-6 py-3.5">
+                <div className="divide-y divide-slate-100">
+                  {reports.map((r) => {
+                    const isExpanded = !!expandedReports[r.id];
+                    const itemCount = r.items?.length || 1;
+                    return (
+                      <div key={r.id} className="p-4 hover:bg-slate-50/50 transition-colors">
+                        {/* Panel Header Summary Row */}
+                        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                          <div className="flex items-center gap-3">
+                            <button
+                              onClick={() => toggleExpand(r.id)}
+                              className="p-1 text-slate-400 hover:text-slate-600 rounded hover:bg-slate-100"
+                            >
+                              {isExpanded ? (
+                                <ChevronDown className="w-4 h-4" />
+                              ) : (
+                                <ChevronRight className="w-4 h-4" />
+                              )}
+                            </button>
+                            <div>
+                              <div className="flex items-center gap-2">
+                                <span className="font-bold text-slate-800 text-sm">{r.report_type}</span>
+                                <span className="font-mono text-[11px] text-slate-400">({r.id})</span>
+                                <span className="text-[11px] font-medium px-2 py-0.5 rounded-full bg-slate-100 text-slate-600">
+                                  {itemCount} {itemCount === 1 ? "metric" : "metrics"}
+                                </span>
+                              </div>
+                              <p className="text-xs text-slate-400 mt-0.5">Tested on {r.report_date}</p>
+                            </div>
+                          </div>
+
+                          <div className="flex items-center gap-3 self-end sm:self-center">
                             <StatusBadge status={r.status} />
-                          </td>
-                          <td className="px-6 py-3.5">
-                            {r.file_path ? (
+
+                            {r.file_path && (
                               <button
                                 onClick={() =>
                                   onPreviewDocument(
@@ -421,25 +428,90 @@ export default function PatientsView({
                                 className="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-semibold text-indigo-600 bg-indigo-50 hover:bg-indigo-100 rounded-lg transition-colors"
                               >
                                 <Eye className="w-3.5 h-3.5" />
-                                <span>Preview</span>
+                                <span>Lab Slip</span>
                               </button>
-                            ) : (
-                              <span className="text-slate-300 text-xs">—</span>
                             )}
-                          </td>
-                          <td className="px-6 py-3.5 text-right">
+
                             <button
                               onClick={() => handleDeleteReport(r.id)}
                               className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"
-                              title="Delete Report"
+                              title="Delete panel"
                             >
                               <Trash2 className="w-4 h-4" />
                             </button>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                          </div>
+                        </div>
+
+                        {/* Expanded Child Items Breakdown Table */}
+                        {isExpanded && (
+                          <div className="mt-3.5 pl-7 pr-2">
+                            <div className="bg-slate-50/80 rounded-xl border border-slate-200/70 overflow-hidden">
+                              <table className="w-full text-left text-xs">
+                                <thead>
+                                  <tr className="bg-slate-100/70 text-slate-500 font-semibold border-b border-slate-200/60 uppercase tracking-wider text-[10px]">
+                                    <th className="px-4 py-2">Test Parameter</th>
+                                    <th className="px-4 py-2">Observed Result</th>
+                                    <th className="px-4 py-2">Reference Range</th>
+                                    <th className="px-4 py-2 text-right">Status</th>
+                                  </tr>
+                                </thead>
+                                <tbody className="divide-y divide-slate-100">
+                                  {r.items && r.items.length > 0 ? (
+                                    r.items.map((it, idx) => (
+                                      <tr key={idx} className="hover:bg-white/80 transition-colors">
+                                        <td className="px-4 py-2 font-medium text-slate-800">
+                                          {it.name}
+                                        </td>
+                                        <td className="px-4 py-2 font-extrabold text-slate-800">
+                                          {it.result_value}{" "}
+                                          <span className="font-normal text-slate-500 text-[10px]">
+                                            {it.unit}
+                                          </span>
+                                        </td>
+                                        <td className="px-4 py-2 text-slate-500 text-[11px] font-mono">
+                                          {it.ref_min !== null && it.ref_min !== undefined && it.ref_max !== null && it.ref_max !== undefined && it.ref_min !== 0 && it.ref_max !== 0
+                                            ? `[${it.ref_min} – ${it.ref_max} ${it.unit}]`
+                                            : "Qualitative / Std"}
+                                        </td>
+                                        <td className="px-4 py-2 text-right">
+                                          <span
+                                            className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                                              it.status === "Abnormal"
+                                                ? "bg-rose-100 text-rose-700"
+                                                : "bg-emerald-100 text-emerald-700"
+                                            }`}
+                                          >
+                                            {it.status}
+                                          </span>
+                                        </td>
+                                      </tr>
+                                    ))
+                                  ) : (
+                                    <tr className="hover:bg-white/80">
+                                      <td className="px-4 py-2 font-medium text-slate-800">
+                                        {r.report_type}
+                                      </td>
+                                      <td className="px-4 py-2 font-extrabold text-slate-800">
+                                        {r.result_value} {r.unit}
+                                      </td>
+                                      <td className="px-4 py-2 text-slate-500 text-[11px] font-mono">
+                                        [{r.ref_min} – {r.ref_max} {r.unit}]
+                                      </td>
+                                      <td className="px-4 py-2 text-right">
+                                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-100 text-slate-700">
+                                          {r.status}
+                                        </span>
+                                      </td>
+                                    </tr>
+                                  )}
+                                </tbody>
+                              </table>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
                 </div>
               )}
             </div>
